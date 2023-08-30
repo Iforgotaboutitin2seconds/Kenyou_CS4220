@@ -1,48 +1,55 @@
-// Client side C/C++ program to demonstrate Socket
-// programming
-#include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+
 #define PORT 8080
+#define BUFFER_SIZE 1024
 
-int main(int argc, char const *argv[])
-{
-	int status, valread, client_fd;
-	struct sockaddr_in serv_addr;
-	char *hello = "Hello from client";
-	char buffer[1024] = {0};
-	if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	{
-		printf("\n Socket creation error \n");
-		return -1;
-	}
+int main() {
+    int client_socket;
+    struct sockaddr_in server_address;
+    char buffer[BUFFER_SIZE];
 
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(PORT);
+    // Create socket
+    if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
 
-	// Convert IPv4 and IPv6 addresses from text to binary
-	// form
-	if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
-	{
-		printf(
-			"\nInvalid address/ Address not supported \n");
-		return -1;
-	}
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(PORT);
+    server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	if ((status = connect(client_fd, (struct sockaddr *)&serv_addr,
-						  sizeof(serv_addr))) < 0)
-	{
-		printf("\nConnection Failed \n");
-		return -1;
-	}
-	send(client_fd, hello, strlen(hello), 0);
-	printf("Hello message sent\n");
-	valread = read(client_fd, buffer, 1024);
-	printf("%s\n", buffer);
+    // Connect to the server
+    if (connect(client_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
 
-	// closing the connected socket
-	close(client_fd);
-	return 0;
+    printf("Connected to server\n");
+
+    // Open the file to send
+    FILE *file_to_send = fopen("file_to_send.txt", "rb");
+    if (!file_to_send) {
+        perror("File open failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Send file
+    while (1) {
+        int bytes_read = fread(buffer, 1, BUFFER_SIZE, file_to_send);
+        if (bytes_read <= 0) {
+            break;
+        }
+        send(client_socket, buffer, bytes_read, 0);
+    }
+    fclose(file_to_send);
+
+    printf("File sent\n");
+
+    close(client_socket);
+
+    return 0;
 }
