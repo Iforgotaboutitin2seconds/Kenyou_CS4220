@@ -13,7 +13,7 @@ int main() {
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
 
-    // Create socket
+    // Creating socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
