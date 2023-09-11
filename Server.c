@@ -5,7 +5,8 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <cstring.h>
+#include <cstring>
+#include <iostream>
 
 #define SERVER_PORT 12345
 #define BUF_SIZE 4096
