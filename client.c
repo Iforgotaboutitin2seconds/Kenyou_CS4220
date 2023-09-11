@@ -56,7 +56,7 @@ int main(int argc, char *argv)
     }
 }
 
-fatal(char *string)
+void fatal(char *string)
 {
     printf("%s\n", string);
     exit(1);

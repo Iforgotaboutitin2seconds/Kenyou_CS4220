@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     // build address structure to bind to socket
     memset(&channel, 0, sizeof(channel));
     channel.sin_family = AF_INET;
-    channel.sin_addr.saddr = htonl(NADDR_ANY);
+    channel.sin_addr.s_addr = htonl(INADDR_ANY);
     channel.sin_port = htons(SERVER_PORT);
 
     // passive open, wait for connection
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
         read(sa, buf, BUF_SIZE);
 
         // get and return file
-        fd = open(buf, O_RDNOLY);
+        fd = open(buf, O_RDONLY);
         if (fd < 0)
             fatal("open failed");
 
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     }
 }
 
-fatal(char *string)
+void fatal(char *string)
 {
     printf("%s\n", string);
     exit(1);
