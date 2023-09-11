@@ -1,11 +1,11 @@
-#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <cstring>
-#include <iostream>
 
 #define SERVER_PORT 12345
 #define BUF_SIZE 4096
