@@ -12,7 +12,7 @@
 
 void fatal(char *string);
 
-int main(int argc, chat *argv[])
+int main(int argc, char *argv[])
 {
     int s, b, l, fd, sa, bytes, on = 1;
     char buf[BUF_SIZE];
