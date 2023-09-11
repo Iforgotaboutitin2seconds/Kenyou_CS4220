@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <string.h>
+#include <string.h> 
 #include <netinet/in.h>
+#include <netdb.h>
 #include <fcntl.h>
 
 #define SERVER_PORT 12345
@@ -18,11 +19,13 @@ int main(int argc, char *argv[])
     char buf[BUF_SIZE];
     struct sockaddr_in channel;
 
+    // build address structure to bind to socket
     memset(&channel, 0, sizeof(channel));
     channel.sin_family = AF_INET;
     channel.sin_addr.s_addr = htonl(INADDR_ANY);
     channel.sin_port = htons(SERVER_PORT);
 
+    // passive open, wait for connection
     s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s < 0)
         fatal("socket failed");
@@ -36,30 +39,32 @@ int main(int argc, char *argv[])
     if (l < 0)
         fatal("listen failed");
 
+    // socket is now set up and bound. Wait for connection and process it.
     while (1)
     {
+        // block for connection request
         sa = accept(s, 0, 0);
         if (sa < 0)
             fatal("accept failed");
 
-        // Read the filename from the client
+        // read file name from socket
         read(sa, buf, BUF_SIZE);
 
-        // Open a file for writing
-        fd = open(buf, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        // get and return file
+        fd = open(buf, O_RDONLY);
         if (fd < 0)
             fatal("open failed");
 
         while (1)
         {
-            bytes = read(sa, buf, BUF_SIZE);
+            bytes = read(fd, buf, BUF_SIZE);
             if (bytes <= 0)
                 break;
-            write(fd, buf, bytes);
+            write(sa, buf, bytes);
         }
-
-        // Close the file and the socket
+        // close file
         close(fd);
+        // close connection
         close(sa);
     }
 }

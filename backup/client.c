@@ -15,46 +15,45 @@ void fatal(char *string);
 int main(int argc, char *argv[])
 {
     int c, s, bytes;
+    // buffer for incoming file
     char buf[BUF_SIZE];
+    // info about server
     struct hostent *h;
+    // holds IP address
     struct sockaddr_in channel;
 
-    if (argc != 4)
-        fatal("Usage: client server-name file-to-send");
+    if (argc != 3)
+        fatal("Usage: client server-name file-name");
 
+    // look up host's IP address
     h = gethostbyname(argv[1]);
     if (!h)
-        fatal("gethostbyname");
-
+        fatal("socket");
     memset(&channel, 0, sizeof(channel));
     channel.sin_family = AF_INET;
     memcpy(&channel.sin_addr.s_addr, h->h_addr, h->h_length);
     channel.sin_port = htons(SERVER_PORT);
 
-    s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0)
-        fatal("socket");
-
     c = connect(s, (struct sockaddr *)&channel, sizeof(channel));
     if (c < 0)
         fatal("connect failed");
 
-    // Send the filename to the server
-    write(s, argv[3], strlen(argv[3]) + 1);
+    // connection is now established. Send file name inlcuding 0 byte at end.
+    write(s, argv[2], strlen(argv[2]) + 1);
 
-    // Open and send the file to the server
-    FILE *file = fopen(argv[3], "rb");
-    if (!file)
-        fatal("file not found");
-
-    while ((bytes = fread(buf, 1, BUF_SIZE, file)) > 0)
+    // go get the file and write it o standard output
+    while (1)
     {
-        write(s, buf, bytes);
-    }
+        // read from socket
+        bytes = read(s, buf, BUF_SIZE);
 
-    fclose(file);
-    close(s);
-    return 0;
+        // check for end of file
+        if (bytes <= 0)
+            exit(0);
+
+        // write to standard output
+        write(1, buf, bytes);
+    }
 }
 
 void fatal(char *string)
