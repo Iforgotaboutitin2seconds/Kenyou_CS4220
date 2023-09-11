@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     while (1)
     {
         // block for connection request
-        sa = accpet(s, 0, 0);
+        sa = accept(s, 0, 0);
         if (sa < 0)
             fatal("accept failed");
 
