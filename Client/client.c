@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     struct hostent *h;
     struct sockaddr_in channel;
 
-    if (argc != 4)
+    if (argc != 3)
         fatal("Usage: client server-name file-to-send");
 
     h = gethostbyname(argv[1]);
@@ -40,10 +40,10 @@ int main(int argc, char *argv[])
         fatal("connect failed");
 
     // Send the filename to the server
-    write(s, argv[3], strlen(argv[3]) + 1);
+    write(s, argv[2], strlen(argv[2]) + 1);
 
     // Open and send the file to the server
-    FILE *file = fopen(argv[3], "rb");
+    FILE *file = fopen(argv[2], "rb");
     if (!file)
         fatal("file not found");
 
