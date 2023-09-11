@@ -6,6 +6,8 @@
 #define SERVER_PORT 12345
 #define BUF_SIZE 4096
 
+void fatal(char *string);
+
 int main(int argc, char *argv)
 {
     int c, s, bytes;
