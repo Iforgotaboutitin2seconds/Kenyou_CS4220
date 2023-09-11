@@ -20,7 +20,7 @@ int main(int argc, char *argv)
         fatal("Usage: client server-name file-name");
 
     // look up host's IP address
-    h = gethostbyname(arvg[1]);
+    h = gethostbyname(argv[1]);
     if (!h)
         fatal("socket");
     memset(&channel, 0, sizeof(channel));
