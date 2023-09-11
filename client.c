@@ -12,7 +12,7 @@
 
 void fatal(char *string);
 
-int main(int argc, char *argv)
+int main(int argc, char *argv[])
 {
     int c, s, bytes;
     // buffer for incoming file
