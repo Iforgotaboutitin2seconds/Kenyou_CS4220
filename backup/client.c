@@ -54,6 +54,8 @@ int main(int argc, char *argv[])
         // write to standard output
         write(1, buf, bytes);
     }
+
+    return 0;
 }
 
 void fatal(char *string)
