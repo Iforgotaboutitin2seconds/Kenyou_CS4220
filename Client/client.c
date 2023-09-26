@@ -19,6 +19,7 @@ int main(int argc, char *argv[])
     struct hostent *h;
     struct sockaddr_in channel;
 
+    // If the input does not have 2 input, localhost and the name of file to send
     if (argc != 3)
         fatal("Usage: client server-name file-to-send");
 
