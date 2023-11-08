@@ -11,7 +11,7 @@
 #define SERVER_PORT 8000
 #define BUFFER_SIZE 1024
 #define WINDOW_SIZE 4
-#define TIMEOUT 2
+#define TIMEOUT 5
 
 int sock;
 struct sockaddr_in server_addr;
