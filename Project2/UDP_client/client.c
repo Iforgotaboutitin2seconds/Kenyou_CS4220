@@ -96,5 +96,6 @@ int main() {
 
 	fclose(fp);
 	close(sock);
+	break;
 	return 0;
 }
