@@ -1,187 +1,130 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+// client code for UDP socket programming 
+#include <arpa/inet.h> 
+#include <netinet/in.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+#include <sys/socket.h> 
+#include <sys/types.h> 
 #include <unistd.h>
 #include <signal.h>
-#include <stdbool.h>
+#include <sys/time.h>
 
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 12345
-#define BUFFER_SIZE 1024
-#define WINDOW_SIZE 4
-#define TIMEOUT 5
+#define IP_PROTOCOL 0 
+#define IP_ADDRESS "127.0.0.1" // localhost 
+#define PORT_NO 15050 
+#define NET_BUF_SIZE 32 
+#define cipherKey 'S' 
+#define sendrecvflag 0 
+#define TIMEOUT 3 // in seconds
 
-struct packet {
-    int seq_num;
-    char data[BUFFER_SIZE];
-};
+// function to clear buffer 
+void clearBuf(char* b) 
+{ 
+	int i; 
+	for (i = 0; i < NET_BUF_SIZE; i++) 
+		b[i] = '\0'; 
+} 
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: %s <filename>\n", argv[0]);
-        return 1;
-    }
+// function for decryption 
+char Cipher(char ch) 
+{ 
+	return ch ^ cipherKey; 
+} 
 
-    char *filename = argv[1];
+// function to receive file 
+int recvFile(char* buf, int s) 
+{ 
+	int i; 
+	char ch; 
+	for (i = 0; i < s; i++) { 
+		ch = buf[i]; 
+		ch = Cipher(ch); 
+		if (ch == EOF) 
+			return 1; 
+		else
+			printf("%c", ch); 
+	} 
+	return 0; 
+}
 
-    // Open the file for reading
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL) {
-        perror("fopen");
-        return 1;
-    }
+int sockfd;
+struct sockaddr_in addr_con;
+int addrlen = sizeof(addr_con);
+char net_buf[NET_BUF_SIZE];
+int base = 0;
+int next_seq_num = 0;
+int window_size = 4;
+int timeout_flag = 0;
 
-    // Create a UDP socket
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("socket");
-        return 1;
-    }
+void timeout_handler(int signal) {
+    timeout_flag = 1;
+}
 
-    // Set up the server address
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
-        perror("inet_pton");
-        return 1;
-    }
+int main() 
+{ 
+	// socket() 
+	sockfd = socket(AF_INET, SOCK_DGRAM, IP_PROTOCOL); 
 
-    // Initialize variables for Go Back-N protocol
-    int base = 0;
-    int next_seq_num = 0;
-    int expected_ack = 0;
-    struct packet window[WINDOW_SIZE];
-    bool sent[WINDOW_SIZE] = {false};
-    bool received_ack[WINDOW_SIZE] = {false};
-    struct timeval timer;
-    timer.tv_sec = TIMEOUT;
-    timer.tv_usec = 0;
+	if (sockfd < 0) {
+		perror("\nFile descriptor not received!!");
+		exit(EXIT_FAILURE);
+	}
 
-    // Send the file to the server
-    char buffer[BUFFER_SIZE];
-    size_t bytes_read;
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        // Wait for ACKs
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(sockfd, &readfds);
-        int select_result = select(sockfd + 1, &readfds, NULL, NULL, &timer);
-        if (select_result == -1) {
-            perror("select");
-            return 1;
-        } else if (select_result == 0) {
-            // Timeout occurred, resend packets
-            for (int i = base; i < next_seq_num; i++) {
-                if (!received_ack[i % WINDOW_SIZE]) {
-                    if (sendto(sockfd, &window[i % WINDOW_SIZE], sizeof(struct packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                        perror("sendto");
-                        return 1;
-                    }
-                }
-            }
-            timer.tv_sec = TIMEOUT;
-            timer.tv_usec = 0;
-            continue;
-        }
+	printf("\nFile descriptor %d received\n", sockfd);
 
-        // Receive ACKs
-        struct packet ack_packet;
-        ssize_t recv_result = recv(sockfd, &ack_packet, sizeof(struct packet), 0);
-        if (recv_result < 0) {
-            perror("recv");
-            return 1;
-        } else if (recv_result == 0) {
-            printf("Server closed connection\n");
-            return 1;
-        }
+	addr_con.sin_family = AF_INET; 
+	addr_con.sin_port = htons(PORT_NO); 
+	addr_con.sin_addr.s_addr = inet_addr(IP_ADDRESS); 
 
-        // Update variables based on received ACK
-        int ack_num = ack_packet.seq_num;
-        if (ack_num >= base && ack_num < next_seq_num) {
-            received_ack[ack_num % WINDOW_SIZE] = true;
-            while (received_ack[base % WINDOW_SIZE]) {
-                received_ack[base % WINDOW_SIZE] = false;
-                sent[base % WINDOW_SIZE] = false;
-                base++;
-            }
-            timer.tv_sec = TIMEOUT;
-            timer.tv_usec = 0;
-        }
+	FILE* fp; 
+	struct sigaction sa;
+    sa.sa_handler = timeout_handler;
+    sigaction(SIGALRM, &sa, NULL);
 
-        // Send packets
-        if (next_seq_num < base + WINDOW_SIZE) {
-            struct packet data_packet;
-            data_packet.seq_num = next_seq_num;
-            memcpy(data_packet.data, buffer, bytes_read);
-            memcpy(window[next_seq_num % WINDOW_SIZE].data, buffer, bytes_read);
-            window[next_seq_num % WINDOW_SIZE].seq_num = next_seq_num;
-            if (sendto(sockfd, &data_packet, sizeof(struct packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                perror("sendto");
-                return 1;
-            }
-            sent[next_seq_num % WINDOW_SIZE] = true;
-            next_seq_num++;
-        }
-    }
+	while (1) { 
+		printf("\nPlease enter file name to receive:\n"); 
+		scanf("%s", net_buf); 
+		sendto(sockfd, net_buf, NET_BUF_SIZE, 
+			sendrecvflag, (struct sockaddr*)&addr_con, 
+			addrlen); 
 
-    // Wait for final ACKs
-    while (base < next_seq_num) {
-        // Wait for ACKs
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(sockfd, &readfds);
-        int select_result = select(sockfd + 1, &readfds, NULL, NULL, &timer);
-        if (select_result == -1) {
-            perror("select");
-            return 1;
-        } else if (select_result == 0) {
-            // Timeout occurred, resend packets
-            for (int i = base; i < next_seq_num; i++) {
-                if (!received_ack[i % WINDOW_SIZE]) {
-                    if (sendto(sockfd, &window[i % WINDOW_SIZE], sizeof(struct packet), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                        perror("sendto");
-                        return 1;
-                    }
-                }
-            }
-            timer.tv_sec = TIMEOUT;
-            timer.tv_usec = 0;
-            continue;
-        }
+		printf("\n---------Data Received---------\n"); 
 
-        // Receive ACKs
-        struct packet ack_packet;
-        ssize_t recv_result = recv(sockfd, &ack_packet, sizeof(struct packet), 0);
-        if (recv_result < 0) {
-            perror("recv");
-            return 1;
-        } else if (recv_result == 0) {
-            printf("Server closed connection\n");
-            return 1;
-        }
+		while (1) { 
+			// receive 
+			clearBuf(net_buf);
+			alarm(TIMEOUT); // Set an alarm for TIMEOUT seconds
+			timeout_flag = 0;
 
-        // Update variables based on received ACK
-        int ack_num = ack_packet.seq_num;
-        if (ack_num >= base && ack_num < next_seq_num) {
-            received_ack[ack_num % WINDOW_SIZE] = true;
-            while (received_ack[base % WINDOW_SIZE]) {
-                received_ack[base % WINDOW_SIZE] = false;
-                sent[base % WINDOW_SIZE] = false;
-                base++;
-            }
-            timer.tv_sec = TIMEOUT;
-            timer.tv_usec = 0;
-        }
-    }
+			while (!timeout_flag) {
+				if (recvfrom(sockfd, net_buf, NET_BUF_SIZE, 
+							 sendrecvflag, (struct sockaddr*)&addr_con, 
+							 &addrlen) > 0) {
+					alarm(0); // Reset the alarm upon successful receipt of data
+					if (net_buf[0] == 'E' && net_buf[1] == 'O' && net_buf[2] == 'F') {
+						goto end;
+					}
 
-    // Close the file and socket
-    fclose(file);
-    close(sockfd);
+					int seq_num = net_buf[0] - '0';
+					if (seq_num >= base && seq_num < base + window_size) {
+						printf("Received packet with sequence number: %d\n", seq_num);
+						if (seq_num == base) {
+							recvFile(net_buf + 1, NET_BUF_SIZE - 1);
+							base++;
+						}
+					}
 
-    return 0;
+					int ack_packet = base;
+					sendto(sockfd, &ack_packet, sizeof(int),
+							sendrecvflag, (struct sockaddr*)&addr_con, addrlen);
+				}
+			}
+		}
+	}
+	
+	end:
+	printf("\n-------------------------------\n"); 
+	close(sockfd);
+	return 0; 
 }
