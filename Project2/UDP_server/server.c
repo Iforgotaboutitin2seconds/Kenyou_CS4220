@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #define BUF_SIZE 1024
 #define PORT 8000
