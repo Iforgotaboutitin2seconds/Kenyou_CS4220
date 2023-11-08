@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #define BUF_SIZE 1024
-#define PORT 8080
+#define PORT 8000
 
 int main() {
     int sockfd;
