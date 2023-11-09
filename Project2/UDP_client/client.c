@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8000
