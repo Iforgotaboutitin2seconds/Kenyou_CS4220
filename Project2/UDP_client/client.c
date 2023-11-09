@@ -54,7 +54,7 @@ int main()
 	// Read and send the file
 	while (!feof(file))
 	{
-		if (next_seq_num < base + WINDOW_SIZE)
+		if (next_seq_num <= base + WINDOW_SIZE)
 		{
 			if (fgets(send_packet.data, BUFFER_SIZE, file) != NULL)
 			{
