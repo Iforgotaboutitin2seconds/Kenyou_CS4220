@@ -13,6 +13,8 @@
 #define WINDOW_SIZE 4
 #define TIMEOUT 5
 
+struct sigaction sa;
+
 typedef struct
 {
     int seq_num;

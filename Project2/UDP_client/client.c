@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8000
@@ -21,6 +22,13 @@ int seq_num = 0;
 int window_base = 0;
 int window_end = WINDOW_SIZE - 1;
 bool is_timer_running = false;
+
+typedef struct {
+    int seq_num;
+    char data[BUFFER_SIZE]; // Ensure BUFFER_SIZE is defined as it is in server.c
+} packet;
+
+struct sigaction sa;
 
 void start_timer() {
 	is_timer_running = true;
