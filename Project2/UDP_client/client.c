@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8000
@@ -12,47 +13,56 @@
 #define WINDOW_SIZE 4
 
 typedef struct {
-    int seq_num;
-    char data[BUFFER_SIZE];
+	int seq_num;
+	char data[BUFFER_SIZE];
 } packet;
 
 int main() {
-    int sockfd;
-    struct sockaddr_in servaddr;
+	int sockfd;
+	struct sockaddr_in servaddr;
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    memset(&servaddr, 0, sizeof(servaddr));
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	memset(&servaddr, 0, sizeof(servaddr));
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    servaddr.sin_port = htons(SERVER_PORT);
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+	servaddr.sin_port = htons(SERVER_PORT);
 
-    packet send_packet;
-    int ack;
-    int base = 0;
-    int next_seq_num = 0;
-    socklen_t len = sizeof(servaddr);
-    
-    // Assume we have a function to fill the packets with data
-    // for the sake of example, we'll just send the same string with different sequence numbers
-    while (next_seq_num < 10) { // Let's send 10 packets for this example
-        if (next_seq_num < base + WINDOW_SIZE) {
-            sprintf(send_packet.data, "Packet %d", next_seq_num);
-            send_packet.seq_num = next_seq_num;
+	packet send_packet;
+	int ack;
+	int base = 0;
+	int next_seq_num = 0;
+	socklen_t len = sizeof(servaddr);
 
-            printf("Sending packet with sequence number %d\n", send_packet.seq_num);
-            sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
-            next_seq_num++;
-        }
+	char filename[100];
+	printf("Enter the filename to send: ");
+	scanf("%s", filename);
 
-        // Wait for ACK
-        // Note: this is a simplified version without timeouts or error checking
-        if (recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len) > 0) {
-            printf("Received ACK for packet: %d\n", ack);
-            base = ack + 1;
-        }
-    }
+	int fd = open(filename, O_RDONLY);
+	if (fd == -1) {
+		printf("Error opening file\n");
+		return 1;
+	}
 
-    close(sockfd);
-    return 0;
+	int n;
+	while ((n = read(fd, send_packet.data, BUFFER_SIZE)) > 0) {
+		if (next_seq_num < base + WINDOW_SIZE) {
+			send_packet.seq_num = next_seq_num;
+
+			printf("Sending packet with sequence number %d\n", send_packet.seq_num);
+			sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
+			next_seq_num++;
+		}
+
+		// Wait for ACK
+		// Note: this is a simplified version without timeouts or error checking
+		if (recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len) > 0) {
+			printf("Received ACK for packet: %d\n", ack);
+			base = ack + 1;
+		}
+	}
+
+	close(fd);
+	close(sockfd);
+	return 0;
 }
