@@ -2,121 +2,88 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <unistd.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <errno.h>
+#include <sys/time.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8000
 #define BUFFER_SIZE 1024
 #define WINDOW_SIZE 4
-#define TIMEOUT 5
-
-int sock;
-struct sockaddr_in server_addr;
-char buffer[BUFFER_SIZE];
-int bytes_read;
-int seq_num = 0;
-int window_base = 0;
-int window_end = WINDOW_SIZE - 1;
-bool is_timer_running = false;
+#define TIMEOUT 2
 
 typedef struct {
     int seq_num;
-    char data[BUFFER_SIZE]; // Ensure BUFFER_SIZE is defined as it is in server.c
+    char data[BUFFER_SIZE];
 } packet;
 
-struct sigaction sa;
-
-void start_timer() {
-	is_timer_running = true;
-	alarm(TIMEOUT);
-}
-
-void stop_timer() {
-	is_timer_running = false;
-	alarm(0);
-}
-
-void handle_timeout(int sig) {
-    printf("Timeout occurred. Resending packets.\n");
-    for (int i = window_base; i <= window_end && i * BUFFER_SIZE < bytes_read; i++) {
-        sendto(sock, buffer + i * BUFFER_SIZE, BUFFER_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-    }
-    start_timer();
-}
-
-void send_packet(int seq_num) {
-	sendto(sock, buffer + seq_num * BUFFER_SIZE, BUFFER_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-	if (seq_num == window_base && !is_timer_running) {
-		start_timer();
-	}
-}
-
 int main() {
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock < 0) {
-		perror("socket creation failed");
-		exit(EXIT_FAILURE);
-	}
+    int sockfd;
+    struct sockaddr_in servaddr;
+    struct timeval tv;
+    fd_set readfds;
+    int retval; // for select() result
 
-	// Set up the signal handler for timeouts using sigaction
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = handle_timeout;
-    sigaction(SIGALRM, &sa, NULL);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    memset(&servaddr, 0, sizeof(servaddr));
 
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
-	server_addr.sin_port = htons(SERVER_PORT);
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    servaddr.sin_port = htons(SERVER_PORT);
 
-	char filename[256];
-	printf("Enter filename: ");
-	fgets(filename, 256, stdin);
-	filename[strcspn(filename, "\n")] = 0; // remove newline character
+    char filename[BUFFER_SIZE];
+    printf("Enter filename to send: ");
+    scanf("%s", filename);
 
-	FILE *fp = fopen(filename, "rb");
-	if (fp == NULL) {
-		perror("file open failed");
-		exit(EXIT_FAILURE);
-	}
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
 
-	while ((bytes_read = fread(buffer, 1, BUFFER_SIZE * WINDOW_SIZE, fp)) > 0) {
-		window_base = 0;
-		window_end = WINDOW_SIZE - 1;
-		seq_num = 0;
+    packet send_packet;
+    int ack;
+    int base = 0;
+    int next_seq_num = 0;
+    socklen_t len = sizeof(servaddr);
 
-		start_timer(); // Start the timer before entering the loop
+    // Read and send the file
+    while (!feof(file)) {
+        if (next_seq_num < base + WINDOW_SIZE) {
+            if (fgets(send_packet.data, BUFFER_SIZE, file) != NULL) {
+                send_packet.seq_num = next_seq_num;
 
-		while (window_base <= bytes_read / BUFFER_SIZE) {
-            struct sockaddr_in from_addr;
-            socklen_t from_len = sizeof(from_addr);
-            packet ack_packet;
-
-            int ack_len = recvfrom(sock, &ack_packet, sizeof(ack_packet), 0, (struct sockaddr*)&from_addr, &from_len);
-            if (ack_len > 0) {
-                printf("Received ACK for packet: %d\n", ack_packet.seq_num);
-                if (ack_packet.seq_num == window_base) {
-                    window_base++;
-                    window_end++;
-                    stop_timer(); // Stop the timer on receiving ACK
-                    if (window_base <= bytes_read / BUFFER_SIZE) {
-                        start_timer(); // Start timer for the next set of packets
-                    }
-                }
-            } else if (ack_len < 0 && errno != EWOULDBLOCK) {
-                perror("recvfrom");
-                exit(EXIT_FAILURE);
+                printf("Sending packet with sequence number %d\n", send_packet.seq_num);
+                sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
+                next_seq_num++;
             }
         }
-	}
 
-	stop_timer(); // Make sure to stop the timer when done
+        // Set up timeout
+        FD_ZERO(&readfds);
+        FD_SET(sockfd, &readfds);
+        tv.tv_sec = TIMEOUT;
+        tv.tv_usec = 0;
 
-	fclose(fp);
-	close(sock);
-	return 0;
+        retval = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+        if (retval == -1) {
+            perror("select()");
+            exit(EXIT_FAILURE);
+        } else if (retval) {
+            // Data is available, read the ACK
+            if (recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len) > 0) {
+                printf("Received ACK for packet: %d\n", ack);
+                base = ack + 1;
+            }
+        } else {
+            // Timeout occurred, resend the window of packets
+            printf("Timeout occurred. Resending from packet %d\n", base);
+            fseek(file, base * BUFFER_SIZE, SEEK_SET); // Rewind file to resend the window
+            next_seq_num = base;
+        }
+    }
+
+    fclose(file);
+    close(sockfd);
+    return 0;
 }
