@@ -11,7 +11,7 @@ typedef struct
 {
     int seq_num;
     char data[BUFFER_SIZE];
-} packet; 
+} packet;
 
 int main()
 {

@@ -106,8 +106,7 @@ int main()
 				send_packet.seq_num = next_seq_num;
 
 				// Calculate packet size
-				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE
-																								   : n % BUFFER_SIZE;
+				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE: n % BUFFER_SIZE;
 
 				// Copy data to packet
 				memcpy(send_packet.data, &send_packet.data[i * BUFFER_SIZE], size);
