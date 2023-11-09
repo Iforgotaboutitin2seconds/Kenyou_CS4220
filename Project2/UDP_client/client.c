@@ -62,7 +62,6 @@ int main()
 
 				printf("Sending packet with sequence number %d\n", send_packet.seq_num);
 				sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
-				printf("Packet sent with sequence number %d\n", send_packet.seq_num);
 				next_seq_num++;
 			}
 		}

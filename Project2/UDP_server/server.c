@@ -13,6 +13,11 @@ typedef struct
     char data[BUFFER_SIZE];
 } packet;
 
+typedef struct
+{
+    int ack_num;
+} ack_packet;
+
 int main()
 {
     int sockfd;
@@ -35,7 +40,6 @@ int main()
     {
         // Receive packet from client
         recvfrom(sockfd, &recv_packet, sizeof(recv_packet), 0, (struct sockaddr *)&cliaddr, &len);
-        printf("Received packet with sequence number %d\n", recv_packet.seq_num);
 
         // Check sequence number
         if (recv_packet.seq_num == expected_seq_num)
@@ -43,7 +47,9 @@ int main()
             printf("Received packet with sequence number %d: %s\n", recv_packet.seq_num, recv_packet.data);
 
             // Send ACK
-            sendto(sockfd, &expected_seq_num, sizeof(expected_seq_num), 0, (struct sockaddr *)&cliaddr, len);
+            ack_packet ack_response;
+            ack_response.ack_num = expected_seq_num;
+            sendto(sockfd, &ack_response, sizeof(ack_response), 0, (struct sockaddr *)&cliaddr, len);
             expected_seq_num++;
         }
         else
