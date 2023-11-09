@@ -33,11 +33,11 @@ void stop_timer() {
 }
 
 void handle_timeout(int sig) {
-	printf("Timeout occurred. Resending packets.\n");
-	for (int i = window_base; i <= window_end; i++) {
-		sendto(sock, buffer + i * BUFFER_SIZE, BUFFER_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-	}
-	start_timer();
+    printf("Timeout occurred. Resending packets.\n");
+    for (int i = window_base; i <= window_end && i * BUFFER_SIZE < bytes_read; i++) {
+        sendto(sock, buffer + i * BUFFER_SIZE, BUFFER_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    }
+    start_timer();
 }
 
 void send_packet(int seq_num) {
@@ -53,6 +53,12 @@ int main() {
 		perror("socket creation failed");
 		exit(EXIT_FAILURE);
 	}
+
+	// Set up the signal handler for timeouts using sigaction
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_timeout;
+    sigaction(SIGALRM, &sa, NULL);
 
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
@@ -74,25 +80,33 @@ int main() {
 		window_base = 0;
 		window_end = WINDOW_SIZE - 1;
 		seq_num = 0;
+
+		start_timer(); // Start the timer before entering the loop
+
 		while (window_base <= bytes_read / BUFFER_SIZE) {
-			for (int i = window_base; i <= window_end && i <= bytes_read / BUFFER_SIZE; i++) {
-				send_packet(i);
-			}
-			int expected_ack = window_base;
-			while (expected_ack <= window_end && expected_ack <= bytes_read / BUFFER_SIZE) {
-				struct sockaddr_in client_addr;
-				socklen_t client_addr_len = sizeof(client_addr);
-				int ack_num;
-				recvfrom(sock, &ack_num, sizeof(ack_num), MSG_DONTWAIT, (struct sockaddr*)&client_addr, &client_addr_len);
-				if (ack_num == expected_ack) {
-					expected_ack++;
-					window_base++;
-					window_end++;
-					stop_timer();
-				}
-			}
-		}
+            struct sockaddr_in from_addr;
+            socklen_t from_len = sizeof(from_addr);
+            packet ack_packet;
+
+            int ack_len = recvfrom(sock, &ack_packet, sizeof(ack_packet), 0, (struct sockaddr*)&from_addr, &from_len);
+            if (ack_len > 0) {
+                printf("Received ACK for packet: %d\n", ack_packet.seq_num);
+                if (ack_packet.seq_num == window_base) {
+                    window_base++;
+                    window_end++;
+                    stop_timer(); // Stop the timer on receiving ACK
+                    if (window_base <= bytes_read / BUFFER_SIZE) {
+                        start_timer(); // Start timer for the next set of packets
+                    }
+                }
+            } else if (ack_len < 0 && errno != EWOULDBLOCK) {
+                perror("recvfrom");
+                exit(EXIT_FAILURE);
+            }
+        }
 	}
+
+	stop_timer(); // Make sure to stop the timer when done
 
 	fclose(fp);
 	close(sock);

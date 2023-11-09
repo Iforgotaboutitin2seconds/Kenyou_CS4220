@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <errno.h>
 
 #define BUF_SIZE 1024
 #define PORT 8000
@@ -18,7 +19,10 @@ typedef struct
     char data[BUF_SIZE];
 } packet;
 
-void timeout_handler(int signum);
+void timeout_handler(int signum)
+{
+    printf("Timeout occurred.\n");
+}
 
 int main()
 {
@@ -26,6 +30,12 @@ int main()
     struct sockaddr_in server_addr, client_addr;
     char buffer[BUF_SIZE];
     int len, n;
+
+    // Set up the signal handler for timeouts using sigaction
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = timeout_handler;
+    sigaction(SIGALRM, &sa, NULL);
 
     // create socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -76,32 +86,30 @@ int main()
             next_seq_num++;
         }
 
+        // Setup the alarm before starting to receive ACKs
+        alarm(TIMEOUT);
+
         // receive acknowledgments
-        while (true)
-        {
+        while (base < next_seq_num) {
             packet ack;
-            int n = recvfrom(sockfd, (char *)&ack, sizeof(ack), MSG_DONTWAIT, (struct sockaddr *)&client_addr, &len);
-            if (n < 0)
-            {
-                break;
-            }
-            printf("Received acknowledgment for sequence number %d.\n", ack.seq_num);
-            if (ack.seq_num >= base && ack.seq_num < base + WINDOW_SIZE)
-            {
-                ack_received[ack.seq_num - base] = true;
-            }
-            if (ack.seq_num == base)
-            {
-                // slide window
-                int i;
-                for (i = 0; i < WINDOW_SIZE && ack_received[i]; i++)
-                {
-                    ack_received[i] = false;
+            int ack_len = recvfrom(sockfd, (char *)&ack, sizeof(ack), 0, (struct sockaddr *)&client_addr, &len);
+            if (ack_len > 0) {
+                printf("Received acknowledgment for sequence number %d.\n", ack.seq_num);
+                if (ack.seq_num >= base && ack.seq_num < base + WINDOW_SIZE) {
+                    ack_received[ack.seq_num - base] = true;
                 }
-                base += i;
-                next_seq_num = base;
-                alarm(0);
-                break;
+                if (ack.seq_num == base) {
+                    // slide window
+                    int i;
+                    for (i = 0; i < WINDOW_SIZE && ack_received[i]; i++) {
+                        ack_received[i] = false;
+                    }
+                    base += i;
+                    alarm(0); // Cancel the timer if ACK is received
+                }
+            } else if (errno != EWOULDBLOCK) {
+                perror("recvfrom");
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -116,9 +124,4 @@ int main()
 
     close(sockfd);
     return 0;
-}
-
-void timeout_handler(int signum)
-{
-    printf("Timeout occurred.\n");
 }
