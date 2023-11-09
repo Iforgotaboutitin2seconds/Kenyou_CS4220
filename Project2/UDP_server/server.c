@@ -35,6 +35,7 @@ int main()
     {
         // Receive packet from client
         recvfrom(sockfd, &recv_packet, sizeof(recv_packet), 0, (struct sockaddr *)&cliaddr, &len);
+        printf("Received packet with sequence number %d\n", recv_packet.seq_num);
 
         // Check sequence number
         if (recv_packet.seq_num == expected_seq_num)
