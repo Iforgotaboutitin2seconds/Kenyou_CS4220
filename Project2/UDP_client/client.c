@@ -59,7 +59,6 @@ int main()
 		{
 			if (next_seq_num < base + WINDOW_SIZE)
 			{
-				packet send_packet;
 				send_packet.seq_num = next_seq_num;
 				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE
 																								   : n % BUFFER_SIZE;
