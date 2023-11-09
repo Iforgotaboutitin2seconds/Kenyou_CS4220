@@ -7,19 +7,12 @@
 #define PORT 8000
 #define BUFFER_SIZE 1024
 
-typedef struct
-{
+typedef struct {
     int seq_num;
     char data[BUFFER_SIZE];
 } packet;
 
-typedef struct
-{
-    int ack_num;
-} ack_packet;
-
-int main()
-{
+int main() {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr;
 
@@ -36,26 +29,20 @@ int main()
     int len = sizeof(cliaddr);
     int expected_seq_num = 0;
 
-    while (1)
-    {
+    while (1) {
         // Receive packet from client
         recvfrom(sockfd, &recv_packet, sizeof(recv_packet), 0, (struct sockaddr *)&cliaddr, &len);
-
+        
         // Check sequence number
-        if (recv_packet.seq_num == expected_seq_num)
-        {
+        if (recv_packet.seq_num == expected_seq_num) {
             printf("Received packet with sequence number %d: %s\n", recv_packet.seq_num, recv_packet.data);
-
+            
             // Send ACK
-            ack_packet ack_response;
-            ack_response.ack_num = expected_seq_num;
-            sendto(sockfd, &ack_response, sizeof(ack_response), 0, (struct sockaddr *)&cliaddr, len);
+            sendto(sockfd, &expected_seq_num, sizeof(expected_seq_num), 0, (struct sockaddr *)&cliaddr, len);
             expected_seq_num++;
-        }
-        else
-        {
+        } else {
             printf("Received out of order packet. Expected: %d, Received: %d\n", expected_seq_num, recv_packet.seq_num);
-
+            
             // Send duplicate ACK for the last in-order packet
             int dup_ack = expected_seq_num - 1;
             sendto(sockfd, &dup_ack, sizeof(dup_ack), 0, (struct sockaddr *)&cliaddr, len);
