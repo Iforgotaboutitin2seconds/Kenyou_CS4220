@@ -46,19 +46,23 @@ int main() {
 
 	int n;
 	while ((n = read(fd, send_packet.data, BUFFER_SIZE)) > 0) {
-		if (next_seq_num < base + WINDOW_SIZE) {
-			send_packet.seq_num = next_seq_num;
+		int num_packets = (n + BUFFER_SIZE - 1) / BUFFER_SIZE;
+		for (int i = 0; i < num_packets; i++) {
+			if (next_seq_num < base + WINDOW_SIZE) {
+				send_packet.seq_num = next_seq_num;
+				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : BUFFER_SIZE;
+				printf("Sending packet with sequence number %d and size %d\n", send_packet.seq_num, size);
+				memcpy(send_packet.data, &send_packet.data[i * BUFFER_SIZE], size);
+				sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
+				next_seq_num++;
+			}
 
-			printf("Sending packet with sequence number %d\n", send_packet.seq_num);
-			sendto(sockfd, &send_packet, sizeof(send_packet), 0, (struct sockaddr *)&servaddr, len);
-			next_seq_num++;
-		}
-
-		// Wait for ACK
-		// Note: this is a simplified version without timeouts or error checking
-		if (recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len) > 0) {
-			printf("Received ACK for packet: %d\n", ack);
-			base = ack + 1;
+			// Wait for ACK
+			// Note: this is a simplified version without timeouts or error checking
+			if (recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len) > 0) {
+				printf("Received ACK for packet: %d\n", ack);
+				base = ack + 1;
+			}
 		}
 	}
 
