@@ -1,3 +1,10 @@
+/*
+ * This program implements a simple UDP client that sends a file to a server using a sliding window protocol.
+ * The client reads the file in chunks of BUFFER_SIZE and sends each chunk as a packet to the server.
+ * The server sends an acknowledgement for each packet received, and the client resends any packets that are not acknowledged within TIMEOUT seconds.
+ * The sliding window size is defined by WINDOW_SIZE.
+ * The program takes the filename to send as input from the user.
+ */
 #define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <stdlib.h>

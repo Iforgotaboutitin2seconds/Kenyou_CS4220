@@ -13,6 +13,15 @@ typedef struct
     char data[BUFFER_SIZE];
 } packet;
 
+/**
+ * @brief This program implements a simple UDP server that receives packets from a client and sends back ACKs.
+ *
+ * The server listens on port 8000 and expects packets of type 'packet' defined above. It checks the sequence number
+ * of each packet and sends back an ACK with the expected sequence number if the received packet is in order. If the
+ * received packet is out of order, it sends back a duplicate ACK for the last in-order packet.
+ *
+ * @return int
+ */
 int main()
 {
     int sockfd;
