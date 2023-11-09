@@ -15,12 +15,14 @@
 #define WINDOW_SIZE 4
 #define TIMEOUT 2 // seconds
 
-typedef struct {
+typedef struct
+{
 	int seq_num;
 	char data[BUFFER_SIZE];
 } packet;
 
-int main() {
+int main()
+{
 	int sockfd;
 	struct sockaddr_in servaddr;
 
@@ -42,19 +44,25 @@ int main() {
 	scanf("%s", filename);
 
 	int fd = open(filename, O_RDONLY);
-	if (fd == -1) {
+	if (fd == -1)
+	{
 		printf("Error opening file\n");
 		return 1;
 	}
 
 	int n;
 	off_t offset = 0;
-	while ((n = pread(fd, send_packet.data, BUFFER_SIZE, offset)) > 0) {
+	while ((n = pread(fd, send_packet.data, BUFFER_SIZE, offset)) > 0)
+	{
 		int num_packets = (n + BUFFER_SIZE - 1) / BUFFER_SIZE;
-		for (int i = 0; i < num_packets; i++) {
-			if (next_seq_num < base + WINDOW_SIZE) {
+		for (int i = 0; i < num_packets; i++)
+		{
+			if (next_seq_num < base + WINDOW_SIZE)
+			{
+				packet send_packet;
 				send_packet.seq_num = next_seq_num;
-				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE : n % BUFFER_SIZE;
+				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE
+																								   : n % BUFFER_SIZE;
 				printf("Sending packet with sequence number %d and size %d\n", send_packet.seq_num, size);
 				memcpy(send_packet.data, &send_packet.data[i * BUFFER_SIZE], size);
 				sendto(sockfd,
