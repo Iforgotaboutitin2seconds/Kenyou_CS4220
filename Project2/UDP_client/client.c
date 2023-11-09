@@ -13,6 +13,7 @@
 #define SERVER_PORT 8000
 #define BUFFER_SIZE 1024
 #define WINDOW_SIZE 4
+#define TIMEOUT 2
 
 typedef struct
 {
@@ -20,10 +21,34 @@ typedef struct
 	char data[BUFFER_SIZE];
 } packet;
 
+int check_timeout(struct timeval *start, int timeout)
+{
+	struct timeval now, diff;
+	gettimeofday(&now, NULL);
+	timersub(&now, start, &diff);
+	if (diff.tv_sec > timeout || (diff.tv_sec == timeout && diff.tv_usec > 0))
+	{
+		return 1;
+	}
+	return 0;
+}
+
 int main()
 {
 	int sockfd;
 	struct sockaddr_in servaddr;
+
+	// Add a structure to keep track of the send times for each packet
+	struct timeval send_times[WINDOW_SIZE];
+
+	// Initialize all send times to 0
+	for (int i = 0; i < WINDOW_SIZE; i++)
+	{
+		timerclear(&send_times[i]);
+	}
+
+	// Set the timeout duration (in seconds)
+	int timeout_duration = TIMEOUT;
 
 	// Create a UDP socket
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -96,6 +121,62 @@ int main()
 
 				// Increment sequence number
 				next_seq_num++;
+
+				// Record the time the packet was sent
+				gettimeofday(&send_times[next_seq_num % WINDOW_SIZE], NULL);
+			}
+
+			// Now, listen for ACKs with select() to avoid blocking
+			fd_set readfds;
+			struct timeval tv;
+
+			FD_ZERO(&readfds);
+			FD_SET(sockfd, &readfds);
+
+			// Set timeout for select
+			tv.tv_sec = 0;
+			tv.tv_usec = 100000; // 100 ms for quick reaction time
+
+			int rv = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+
+			if (rv > 0)
+			{ // There's something to read
+				// Receive the ACK
+				recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&servaddr, &len);
+
+				// Check if the ack is for the base packet and update the base
+				if (ack >= base)
+				{
+					base = ack + 1;
+					// Update the send time for the new base (or clear if all caught up)
+					if (base < next_seq_num)
+					{
+						gettimeofday(&send_times[base % WINDOW_SIZE], NULL);
+					}
+					else
+					{
+						timerclear(&send_times[base % WINDOW_SIZE]);
+					}
+				}
+			}
+			else if (rv == 0)
+			{ // Timeout occurred
+				// Check for each packet in the window if it has timed out
+				for (int i = base; i < next_seq_num; i++)
+				{
+					if (check_timeout(&send_times[i % WINDOW_SIZE], timeout_duration))
+					{
+						// Timeout for packet i occurred, resend from base up to next_seq_num
+						for (int j = base; j < next_seq_num; j++)
+						{
+							// Resend packet j
+							// ...
+							// Make sure to reset the send time for packet j
+							gettimeofday(&send_times[j % WINDOW_SIZE], NULL);
+						}
+						break; // Exit the for loop after resending
+					}
+				}
 			}
 		}
 
