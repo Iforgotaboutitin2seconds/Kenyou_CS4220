@@ -22,11 +22,13 @@ and just leave it be
 
 Terminals 2 run client:
 ./client
-Enter file name: message.txt
+Enter file name: m3.txt
 
 You should be able to see the results.
 
 ----------------------------------------------------------------------------
+
+This is how Kenyou Teoh Apprach the problems:
 
 Question 1: How do I make a UDP server?
 
@@ -65,4 +67,13 @@ Took me a while to realize that is because server sees it as 1 client sending fi
 
 Question 3: Time to add Timer.
 
+#include <sys/time.h>
+That is what I needed.
 
+I need to use it to keep in track of time, then I make a function to check if it timeout.
+Once it is timeout, program exited with 1.
+
+I need to add #define _GNU_SOURCE for enable GNU extensions. So it can actually run the functions.
+Annnd it is done. Awesome.
+
+-------------------------------------------------------------------------------

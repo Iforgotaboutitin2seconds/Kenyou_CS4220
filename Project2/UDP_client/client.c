@@ -171,7 +171,6 @@ int main()
 						for (int j = base; j < next_seq_num; j++)
 						{
 							// Resend packet j
-							// ...
 							// Make sure to reset the send time for packet j
 							gettimeofday(&send_times[j % WINDOW_SIZE], NULL);
 						}
