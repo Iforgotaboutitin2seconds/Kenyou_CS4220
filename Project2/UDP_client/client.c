@@ -66,6 +66,10 @@ int main()
 	// Read file and send packets
 	int n;
 	off_t offset = 0;
+	struct timeval tv;
+	tv.tv_sec = TIMEOUT;
+	tv.tv_usec = 0;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 	while ((n = pread(fd, send_packet.data, BUFFER_SIZE, offset)) > 0)
 	{
 		// Calculate number of packets needed to send the data
@@ -97,6 +101,26 @@ int main()
 
 				// Increment sequence number
 				next_seq_num++;
+
+				// Wait for acknowledgement
+				while (recvfrom(sockfd,
+								&ack,
+								sizeof(ack),
+								MSG_WAITALL,
+								(struct sockaddr *)&servaddr,
+								&len) <= 0)
+				{
+					// Resend packets if acknowledgement not received within TIMEOUT seconds
+					sendto(sockfd,
+						   &send_packet,
+						   sizeof(send_packet),
+						   0,
+						   (struct sockaddr *)&servaddr,
+						   sizeof(servaddr));
+				}
+
+				// Update base
+				base = ack + 1;
 			}
 		}
 
