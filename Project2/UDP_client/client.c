@@ -1,10 +1,3 @@
-/*
- * This program implements a simple UDP client that sends a file to a server using a sliding window protocol.
- * The client reads the file in chunks of BUFFER_SIZE and sends each chunk as a packet to the server.
- * The server sends an acknowledgement for each packet received, and the client resends any packets that are not acknowledged within TIMEOUT seconds.
- * The sliding window size is defined by WINDOW_SIZE.
- * The program takes the filename to send as input from the user.
- */
 #define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,23 +26,36 @@ int main()
 	int sockfd;
 	struct sockaddr_in servaddr;
 
+	// Create a UDP socket
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	// Set server address to 0
 	memset(&servaddr, 0, sizeof(servaddr));
 
+	// Set server address family to IPv4
 	servaddr.sin_family = AF_INET;
+
+	// Set server IP address
 	servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+	// Set server port number
 	servaddr.sin_port = htons(SERVER_PORT);
 
+	// Create a packet to send
 	packet send_packet;
+
+	// Initialize variables
 	int ack;
 	int base = 0;
 	int next_seq_num = 0;
 	socklen_t len = sizeof(servaddr);
 
+	// Get filename from user
 	char filename[100];
 	printf("Enter the filename to send: ");
 	scanf("%s", filename);
 
+	// Open file for reading
 	int fd = open(filename, O_RDONLY);
 	if (fd == -1)
 	{
@@ -57,32 +63,48 @@ int main()
 		return 1;
 	}
 
+	// Read file and send packets
 	int n;
 	off_t offset = 0;
 	while ((n = pread(fd, send_packet.data, BUFFER_SIZE, offset)) > 0)
 	{
+		// Calculate number of packets needed to send the data
 		int num_packets = (n + BUFFER_SIZE - 1) / BUFFER_SIZE;
+
+		// Send packets
 		for (int i = 0; i < num_packets; i++)
 		{
+			// Send only if the window is not full
 			if (next_seq_num < base + WINDOW_SIZE)
 			{
+				// Set sequence number
 				send_packet.seq_num = next_seq_num;
+
+				// Calculate packet size
 				int size = (i == num_packets - 1) ? n % BUFFER_SIZE : ((i + 1) * BUFFER_SIZE <= n) ? BUFFER_SIZE
 																								   : n % BUFFER_SIZE;
-				printf("Sending packet with sequence number %d and size %d\n", send_packet.seq_num, size);
+
+				// Copy data to packet
 				memcpy(send_packet.data, &send_packet.data[i * BUFFER_SIZE], size);
+
+				// Send packet
 				sendto(sockfd,
 					   &send_packet,
 					   sizeof(send_packet),
 					   0,
 					   (struct sockaddr *)&servaddr,
 					   sizeof(servaddr));
+
+				// Increment sequence number
 				next_seq_num++;
 			}
 		}
+
+		// Update offset
 		offset += n;
 	}
 
+	// Close file and socket
 	close(fd);
 	close(sockfd);
 

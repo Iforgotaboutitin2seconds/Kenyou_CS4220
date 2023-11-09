@@ -11,29 +11,23 @@ typedef struct
 {
     int seq_num;
     char data[BUFFER_SIZE];
-} packet;
+} packet; 
 
-/**
- * @brief This program implements a simple UDP server that receives packets from a client and sends back ACKs.
- *
- * The server listens on port 8000 and expects packets of type 'packet' defined above. It checks the sequence number
- * of each packet and sends back an ACK with the expected sequence number if the received packet is in order. If the
- * received packet is out of order, it sends back a duplicate ACK for the last in-order packet.
- *
- * @return int
- */
 int main()
 {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr;
 
+    // Create socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    memset(&servaddr, 0, sizeof(servaddr));
 
+    // Initialize server address
+    memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = INADDR_ANY;
     servaddr.sin_port = htons(PORT);
 
+    // Bind socket to server address
     bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
     packet recv_packet;
