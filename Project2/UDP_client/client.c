@@ -13,6 +13,7 @@
 #define SERVER_PORT 8000
 #define BUFFER_SIZE 1024
 #define WINDOW_SIZE 4
+#define TIMEOUT 2 // Timeout in seconds
 
 typedef struct
 {
@@ -96,6 +97,57 @@ int main()
 
 				// Increment sequence number
 				next_seq_num++;
+
+				// Set timeout for the packet
+				struct timeval tv;
+				tv.tv_sec = TIMEOUT;
+				tv.tv_usec = 0;
+				if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+				{
+					perror("Error setting timeout");
+					return 1;
+				}
+
+				// Wait for ACK
+				while (1)
+				{
+					// Receive ACK
+					recvfrom(sockfd,
+							 &ack,
+							 sizeof(ack),
+							 MSG_WAITALL,
+							 (struct sockaddr *)&servaddr,
+							 &len);
+
+					// Check if ACK is for the current packet
+					if (ack == send_packet.seq_num)
+					{
+						// Reset timeout
+						tv.tv_sec = 0;
+						tv.tv_usec = 0;
+						if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+						{
+							perror("Error resetting timeout");
+							return 1;
+						}
+
+						// Move base forward
+						base = ack + 1;
+
+						// Exit loop
+						break;
+					}
+					else
+					{
+						// Resend packet
+						sendto(sockfd,
+							   &send_packet,
+							   sizeof(send_packet),
+							   0,
+							   (struct sockaddr *)&servaddr,
+							   sizeof(servaddr));
+					}
+				}
 			}
 		}
 
